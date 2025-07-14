@@ -234,7 +234,7 @@
 </head>
 <body>
     <h1>간단한 포트리스 게임 (싱글 플레이어)</h1>
-    <p class="controls-info">조작법: WASD (이동/각도), Space (발사)</p>
+    <p class="controls-info">조작법: WASD (이동/각도), 발사! 버튼 클릭 (발사)</p>
     <div id="game-container">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="flash-overlay"></div> <!-- 화면 전체 플래시 효과를 위한 오버레이 -->
@@ -823,7 +823,7 @@
 
         // Fire projectile
         function fireProjectile() {
-            if (isAnimating || currentPlayer.lives <= 0) return; // Check lives instead of health
+            if (isAnimating || currentPlayer.lives <= 0) return;
 
             isAnimating = true;
             disablePlayerControls(); // Disable controls during fire animation
