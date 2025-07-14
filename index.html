@@ -178,6 +178,21 @@
             border-radius: 15px; /* 컨테이너와 동일한 모서리 */
         }
 
+        /* 하트 아이콘 스타일 */
+        .heart {
+            color: red; /* 꽉 찬 하트 */
+            font-size: 1.2em;
+            margin: 0 2px;
+        }
+
+        .broken-heart {
+            color: #ccc; /* 깨진 하트 (회색) */
+            font-size: 1.2em;
+            margin: 0 2px;
+            /* Optional: Add a visual cue for broken, e.g., a line-through or different emoji */
+            /* Using a different Unicode emoji for broken heart: &#x1F494; */
+        }
+
         /* 모바일 반응형 */
         @media (max-width: 768px) {
             #game-container {
@@ -220,9 +235,9 @@
         <div id="game-info">
             <div id="turn-display">현재 턴: 플레이어 1</div>
             <div id="player1-health">플레이어 1 HP: 100</div>
-            <div id="player1-lives">플레이어 1 Lives: 3</div>
+            <div id="player1-lives"></div> <!-- Lives display will be rendered here -->
             <div id="player2-health">컴퓨터 HP: 100</div>
-            <div id="player2-lives">컴퓨터 Lives: 3</div>
+            <div id="player2-lives"></div> <!-- Lives display will be rendered here -->
         </div>
         <div id="message-box"></div>
     </div>
@@ -329,8 +344,8 @@
         let aiLastShotTargetX = null; // AI's last targeted X coordinate (Player 1's X)
         let aiLastShotHitX = null;    // AI's projectile actual landing X coordinate
         let aiShotCount = 0;         // Number of shots fired by AI
-        const AI_RANDOM_DEVIATION_ANGLE = 0.2; // Random error for AI angle (further reduced for more accuracy)
-        const AI_RANDOM_DEVIATION_POWER = 0.2; // Random error for AI power (further reduced for more accuracy)
+        const AI_RANDOM_DEVIATION_ANGLE = 0.1; // Random error for AI angle (further reduced for more accuracy)
+        const AI_RANDOM_DEVIATION_POWER = 0.1; // Random error for AI power (further reduced for more accuracy)
 
         // Keyboard input state
         const keys = {
@@ -376,17 +391,34 @@
             drawGame();
             showMessage('게임 시작! 플레이어 1 턴입니다.', 'info');
             enablePlayerControls();
+            startGameLoop(); // Start the continuous game loop
         }
 
         // Update UI elements
         function updateUI() {
             turnDisplay.textContent = `현재 턴: ${currentPlayer === player1 ? '플레이어 1' : '컴퓨터'}`;
             player1HealthDisplay.textContent = `플레이어 1 HP: ${player1.health}`;
-            player1LivesDisplay.textContent = `플레이어 1 Lives: ${player1.lives}`;
             player2HealthDisplay.textContent = `컴퓨터 HP: ${player2.health}`;
-            player2LivesDisplay.textContent = `컴퓨터 Lives: ${player2.lives}`;
             powerBar.style.width = `${((currentPlayer.power - MIN_POWER) / (MAX_POWER - MIN_POWER)) * 100}%`;
             powerBar.style.backgroundColor = `hsl(${120 - ((currentPlayer.power - MIN_POWER) / (MAX_POWER - MIN_POWER)) * 120}, 100%, 50%)`; // Color changes based on power (green to red)
+            renderLives(player1, player1LivesDisplay); // Render player 1 lives
+            renderLives(player2, player2LivesDisplay); // Render player 2 lives
+        }
+
+        // Render lives as heart icons
+        function renderLives(player, displayElement) {
+            displayElement.innerHTML = ''; // Clear previous hearts
+            for (let i = 0; i < MAX_LIVES; i++) {
+                const span = document.createElement('span');
+                if (i < player.lives) {
+                    span.className = 'heart';
+                    span.innerHTML = '&#x2764;'; // Full heart
+                } else {
+                    span.className = 'broken-heart';
+                    span.innerHTML = '&#x1F494;'; // Broken heart emoji
+                }
+                displayElement.appendChild(span);
+            }
         }
 
         // Display message in message box
@@ -717,8 +749,8 @@
 
             // Iterate through a finer range of angles and powers to find the best shot
             // Increased granularity for better AI accuracy
-            for (let p = MIN_POWER; p <= MAX_POWER; p += 0.2) { // Iterate power with smaller steps
-                for (let a = MIN_ANGLE; a <= MAX_ANGLE; a += 0.5) { // Iterate angle with smaller steps
+            for (let p = MIN_POWER; p <= MAX_POWER; p += 0.1) { // Iterate power with even smaller steps
+                for (let a = MIN_ANGLE; a <= MAX_ANGLE; a += 0.2) { // Iterate angle with even smaller steps
                     // AI's angle is 180 - a because it shoots left
                     const predictedLandingX = predictProjectileLandingX(aiTankX, aiTankY, p, a, aiDirection, canvas.height - GROUND_HEIGHT, player2);
 
@@ -726,16 +758,13 @@
                         const distanceToTarget = Math.abs(predictedLandingX - targetX);
 
                         // Prioritize shots that clear the wall and are close to target
-                        // Ensure it lands between AI and target (for left-shooting AI)
-                        const isBetweenTanks = (aiDirection === -1 && predictedLandingX <= aiTankX && predictedLandingX >= targetX);
-
-                        if (isBetweenTanks) {
-                            if (distanceToTarget < minDistanceToTarget) {
-                                minDistanceToTarget = distanceToTarget;
-                                bestAngle = a;
-                                bestPower = p;
-                                foundValidShot = true;
-                            }
+                        // Removed isBetweenTanks condition to make AI less strict about landing exactly between tanks
+                        // Rely on minDistanceToTarget to find the closest shot.
+                        if (distanceToTarget < minDistanceToTarget) {
+                            minDistanceToTarget = distanceToTarget;
+                            bestAngle = a;
+                            bestPower = p;
+                            foundValidShot = true;
                         }
                     }
                 }
@@ -825,7 +854,32 @@
             animateProjectile();
         }
 
-        // Event Listeners
+        // Handle continuous player input
+        function handlePlayerInput() {
+            if (isAnimating || currentPlayer !== player1) return;
+
+            if (keys.a) { // Move left
+                currentPlayer.x = Math.max(TANK_WIDTH / 2, currentPlayer.x - MOVE_SPEED);
+            }
+            if (keys.d) { // Move right
+                currentPlayer.x = Math.min(canvas.width - TANK_WIDTH / 2, currentPlayer.x + MOVE_SPEED);
+            }
+            if (keys.w) { // Angle up
+                currentPlayer.angle = Math.min(MAX_ANGLE, currentPlayer.angle + ANGLE_CHANGE_SPEED);
+            }
+            if (keys.s) { // Angle down
+                currentPlayer.angle = Math.max(MIN_ANGLE, currentPlayer.angle - ANGLE_CHANGE_SPEED);
+            }
+            drawGame(); // Redraw game after input
+        }
+
+        // Game loop for continuous updates
+        function startGameLoop() { // Renamed from gameLoop
+            handlePlayerInput(); // Process player input
+            requestAnimationFrame(startGameLoop); // Request next frame
+        }
+
+        // Event Listeners for UI buttons
         moveLeftBtn.addEventListener('click', () => {
             if (isAnimating || currentPlayer !== player1) return;
             currentPlayer.x = Math.max(TANK_WIDTH / 2, currentPlayer.x - MOVE_SPEED);
@@ -886,38 +940,22 @@
             if (isAnimating || currentPlayer !== player1) return;
 
             const key = e.key.toLowerCase();
-            if (key === ' ') { // Prevent default spacebar action (scrolling)
+            if ([' ', 'w', 'a', 's', 'd'].includes(key)) { // Prevent default actions for game keys
                 e.preventDefault();
             }
 
             if (keys[key] === false) { // Only process if key was not already pressed
                 keys[key] = true;
 
-                switch (key) {
-                    case 'a': // Move left
-                        currentPlayer.x = Math.max(TANK_WIDTH / 2, currentPlayer.x - MOVE_SPEED);
-                        break;
-                    case 'd': // Move right
-                        currentPlayer.x = Math.min(canvas.width - TANK_WIDTH / 2, currentPlayer.x + MOVE_SPEED);
-                        break;
-                    case 'w': // Angle up
-                        currentPlayer.angle = Math.min(MAX_ANGLE, currentPlayer.angle + ANGLE_CHANGE_SPEED);
-                        break;
-                    case 's': // Angle down
-                        currentPlayer.angle = Math.max(MIN_ANGLE, currentPlayer.angle - ANGLE_CHANGE_SPEED);
-                        break;
-                    case ' ': // Spacebar (fire)
-                        if (!powerCharging) {
-                            powerCharging = true;
-                            fireBtn.textContent = '파워 충전 중...'; // Update button text
-                            powerChargeInterval = setInterval(() => {
-                                currentPlayer.power = Math.min(MAX_POWER, currentPlayer.power + 1);
-                                updateUI();
-                            }, 50);
-                        }
-                        break;
+                // Handle spacebar press to start charging
+                if (key === ' ' && !powerCharging) {
+                    powerCharging = true;
+                    fireBtn.textContent = '파워 충전 중...'; // Update button text
+                    powerChargeInterval = setInterval(() => {
+                        currentPlayer.power = Math.min(MAX_POWER, currentPlayer.power + 1);
+                        updateUI();
+                    }, 50);
                 }
-                drawGame();
             }
         });
 
