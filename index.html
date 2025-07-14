@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>간단한 포트리스 게임</title>
+    <style>
+        /* 전체 페이지 스타일 */
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #2c3e50; /* 어두운 배경 */
+            font-family: 'Inter', sans-serif; /* Inter 폰트 사용 */
+            color: #ecf0f1; /* 밝은 텍스트 색상 */
+            overflow: hidden; /* 스크롤바 방지 */
+        }
+
+        h1 {
+            color: #f1c40f; /* 노란색 제목 */
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        /* 게임 컨테이너 */
+        #game-container {
+            position: relative; /* 플래시 오버레이를 위한 상대 위치 설정 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #34495e; /* 컨테이너 배경 */
+            padding: 20px;
+            border-radius: 15px; /* 둥근 모서리 */
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+            max-width: 90vw; /* 최대 너비 설정 */
+            width: 800px; /* 고정 너비 */
+            box-sizing: border-box;
+        }
+
+        /* 캔버스 스타일 */
+        canvas {
+            background-color: #7f8c8d; /* 캔버스 배경 (하늘) */
+            display: block;
+            border: 3px solid #f1c40f; /* 노란색 테두리 */
+            border-radius: 10px; /* 둥근 모서리 */
+            margin-bottom: 20px;
+            width: 100%; /* 반응형 너비 */
+            height: auto; /* 높이 자동 조절 */
+            aspect-ratio: 4 / 3; /* 4:3 비율 유지 */
+        }
+
+        /* UI 패널 */
+        #ui-panel {
+            display: flex;
+            flex-wrap: wrap; /* 작은 화면에서 줄바꿈 */
+            justify-content: center;
+            gap: 15px;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        /* 버튼 스타일 */
+        button {
+            background-color: #27ae60; /* 녹색 버튼 */
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px; /* 둥근 모서리 */
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            flex-grow: 1; /* 공간에 따라 확장 */
+            max-width: 150px; /* 최대 너비 */
+        }
+
+        button:hover {
+            background-color: #2ecc71; /* 호버 시 밝은 녹색 */
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        button:active {
+            background-color: #27ae60;
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        button:disabled {
+            background-color: #7f8c8d; /* 비활성화 시 회색 */
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* 정보 표시 */
+        #game-info {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            margin-top: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        #game-info div {
+            background-color: #2c3e50;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        #turn-display {
+            color: #3498db; /* 파란색 턴 표시 */
+        }
+
+        #message-box {
+            background-color: #e74c3c; /* 빨간색 메시지 박스 (기본) */
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            opacity: 0; /* 초기에는 숨김 */
+            transition: opacity 0.5s ease;
+        }
+
+        #message-box.show {
+            opacity: 1; /* 보일 때 */
+        }
+
+        #message-box.success {
+            background-color: #27ae60; /* 성공 메시지 */
+        }
+
+        #message-box.info {
+            background-color: #3498db; /* 정보 메시지 */
+        }
+
+        /* 파워 바 */
+        #power-container {
+            width: 100%;
+            height: 25px;
+            background-color: #555;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        #power-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #e74c3c; /* 빨간색 파워 바 */
+            transition: width 0.1s linear;
+        }
+
+        /* 화면 플래시 오버레이 */
+        #flash-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: transparent; /* 초기 투명 */
+            opacity: 0;
+            transition: opacity 0.1s ease-out; /* 빠른 페이드 아웃 */
+            pointer-events: none; /* 아래 요소 클릭/상호작용 허용 */
+            z-index: 10; /* 캔버스 위에 위치 */
+            border-radius: 15px; /* 컨테이너와 동일한 모서리 */
+        }
+
+        /* 모바일 반응형 */
+        @media (max-width: 768px) {
+            #game-container {
+                padding: 15px;
+                width: 95vw;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            button {
+                padding: 10px 20px;
+                font-size: 1em;
+            }
+
+            #game-info {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>간단한 포트리스 게임 (싱글 플레이어)</h1>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="flash-overlay"></div> <!-- 화면 전체 플래시 효과를 위한 오버레이 -->
+        <div id="power-container">
+            <div id="power-bar"></div>
+        </div>
+        <div id="ui-panel">
+            <button id="moveLeftBtn">◀ 이동</button>
+            <button id="moveRightBtn">▶ 이동</button>
+            <button id="angleUpBtn">▲ 각도</button>
+            <button id="angleDownBtn">▼ 각도</button>
+            <button id="fireBtn">발사!</button>
+            <button id="resetBtn">재시작</button>
+        </div>
+        <div id="game-info">
+            <div id="turn-display">현재 턴: 플레이어 1</div>
+            <div id="player1-health">플레이어 1 HP: 100</div>
+            <div id="player1-lives">플레이어 1 Lives: 3</div>
+            <div id="player2-health">컴퓨터 HP: 100</div>
+            <div id="player2-lives">컴퓨터 Lives: 3</div>
+        </div>
+        <div id="message-box"></div>
+    </div>
+
+    <!-- 배경 음악 및 효과음 -->
+    <audio id="bgMusic" loop>
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+    <audio id="fireSound">
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" type="audio/mpeg"> <!-- 발사 효과음 (예시) -->
+        Your browser does not support the audio element.
+    </audio>
+    <audio id="hitSound">
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" type="audio/mpeg"> <!-- 명중 효과음 (예시) -->
+        Your browser does not support the audio element.
+    </audio>
+
+    <script>
+        // Canvas and context setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI elements
+        const moveLeftBtn = document.getElementById('moveLeftBtn');
+        const moveRightBtn = document.getElementById('moveRightBtn');
+        const angleUpBtn = document.getElementById('angleUpBtn');
+        const angleDownBtn = document.getElementById('angleDownBtn');
+        const fireBtn = document.getElementById('fireBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const turnDisplay = document.getElementById('turn-display');
+        const player1HealthDisplay = document.getElementById('player1-health');
+        const player1LivesDisplay = document.getElementById('player1-lives');
+        const player2HealthDisplay = document.getElementById('player2-health');
+        const player2LivesDisplay = document.getElementById('player2-lives');
+        const messageBox = document.getElementById('message-box');
+        const powerBar = document.getElementById('power-bar');
+        const flashOverlay = document.getElementById('flash-overlay'); // Flash overlay element
+
+        // Audio elements
+        const bgMusic = document.getElementById('bgMusic');
+        const fireSound = document.getElementById('fireSound');
+        const hitSound = document.getElementById('hitSound');
+
+        // Game settings
+        const GRAVITY = 0.6; // Gravity
+        const TANK_WIDTH = 50;
+        const TANK_HEIGHT = 30;
+        const CANNON_LENGTH = 30;
+        const PROJECTILE_RADIUS = 5;
+        const GROUND_HEIGHT = 50; // Ground height
+        const MAX_POWER = 25; // Max power
+        const MIN_POWER = 10; // Min power
+        const INITIAL_POWER = 12; // Initial shot power
+        const MAX_ANGLE = 90; // Max angle (vertical)
+        const MIN_ANGLE = 0;  // Min angle (horizontal)
+        const DAMAGE = 10; // Damage per hit
+        const MOVE_SPEED = 5; // Tank movement speed
+        const ANGLE_CHANGE_SPEED = 2; // Angle change speed
+        const MAX_LIVES = 3; // Max lives
+        const HIT_FLASH_DURATION = 300; // Duration of red flash effect in ms
+
+        // Player objects
+        let player1 = {
+            x: 100,
+            y: canvas.height - GROUND_HEIGHT - TANK_HEIGHT / 2, // Tank position above ground
+            angle: 45, // Firing angle (degrees)
+            power: INITIAL_POWER, // Firing power
+            health: 100,
+            lives: MAX_LIVES, // Lives
+            color: '#3498db', // Player 1 color (blue)
+            originalColor: '#3498db', // Store original color for flash effect
+            direction: 1 // 1: right, -1: left
+        };
+
+        let player2 = { // Computer (AI)
+            x: canvas.width - 100,
+            y: canvas.height - GROUND_HEIGHT - TANK_HEIGHT / 2,
+            angle: 135, // Player 2 fires left (180 - 45)
+            power: INITIAL_POWER, // Firing power
+            health: 100,
+            lives: MAX_LIVES, // Lives
+            color: '#e74c3c', // Player 2 color (red)
+            originalColor: '#e74c3c', // Store original color for flash effect
+            direction: -1 // 1: right, -1: left
+        };
+
+        // Wall object
+        let wall = {
+            x: canvas.width / 2 - 40, // Centered horizontally
+            y: canvas.height - GROUND_HEIGHT - 150, // Height above ground
+            width: 80,
+            height: 150,
+            color: '#95a5a6' // Grey wall color
+        };
+
+        let currentPlayer = player1;
+        let projectile = null;
+        let isAnimating = false; // Is projectile animating?
+        let powerCharging = false; // Is power charging?
+        let powerChargeInterval; // Power charging interval ID
+
+        // AI variables
+        let aiLastShotTargetX = null; // AI's last targeted X coordinate (Player 1's X)
+        let aiLastShotHitX = null;    // AI's projectile actual landing X coordinate
+        let aiShotCount = 0;         // Number of shots fired by AI
+        const AI_RANDOM_DEVIATION_ANGLE = 0.2; // Random error for AI angle (further reduced for more accuracy)
+        const AI_RANDOM_DEVIATION_POWER = 0.2; // Random error for AI power (further reduced for more accuracy)
+
+        // Keyboard input state
+        const keys = {
+            w: false,
+            a: false,
+            s: false,
+            d: false,
+            space: false
+        };
+
+        // Game initialization
+        function initGame() {
+            player1.x = 100;
+            player1.y = canvas.height - GROUND_HEIGHT - TANK_HEIGHT / 2;
+            player1.angle = 45;
+            player1.power = INITIAL_POWER;
+            player1.health = 100;
+            player1.lives = MAX_LIVES;
+            player1.color = player1.originalColor; // Reset color
+
+            player2.x = canvas.width - 100;
+            player2.y = canvas.height - GROUND_HEIGHT - TANK_HEIGHT / 2;
+            player2.angle = 135;
+            player2.power = INITIAL_POWER;
+            player2.health = 100;
+            player2.lives = MAX_LIVES;
+            player2.color = player2.originalColor; // Reset color
+
+            currentPlayer = player1;
+            projectile = null;
+            isAnimating = false;
+            powerCharging = false;
+            aiLastShotTargetX = null;
+            aiLastShotHitX = null;
+            aiShotCount = 0;
+
+            // Reset key states
+            for (const key in keys) {
+                keys[key] = false;
+            }
+
+            updateUI();
+            drawGame();
+            showMessage('게임 시작! 플레이어 1 턴입니다.', 'info');
+            enablePlayerControls();
+        }
+
+        // Update UI elements
+        function updateUI() {
+            turnDisplay.textContent = `현재 턴: ${currentPlayer === player1 ? '플레이어 1' : '컴퓨터'}`;
+            player1HealthDisplay.textContent = `플레이어 1 HP: ${player1.health}`;
+            player1LivesDisplay.textContent = `플레이어 1 Lives: ${player1.lives}`;
+            player2HealthDisplay.textContent = `컴퓨터 HP: ${player2.health}`;
+            player2LivesDisplay.textContent = `컴퓨터 Lives: ${player2.lives}`;
+            powerBar.style.width = `${((currentPlayer.power - MIN_POWER) / (MAX_POWER - MIN_POWER)) * 100}%`;
+            powerBar.style.backgroundColor = `hsl(${120 - ((currentPlayer.power - MIN_POWER) / (MAX_POWER - MIN_POWER)) * 120}, 100%, 50%)`; // Color changes based on power (green to red)
+        }
+
+        // Display message in message box
+        function showMessage(msg, type = 'default') {
+            messageBox.textContent = msg;
+            messageBox.className = 'message-box show ' + type;
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, 3000); // Disappears after 3 seconds
+        }
+
+        // Enable/disable player controls
+        function enablePlayerControls() {
+            moveLeftBtn.disabled = false;
+            moveRightBtn.disabled = false;
+            angleUpBtn.disabled = false;
+            angleDownBtn.disabled = false;
+            fireBtn.disabled = false;
+        }
+
+        function disablePlayerControls() {
+            moveLeftBtn.disabled = true;
+            moveRightBtn.disabled = true;
+            angleUpBtn.disabled = true;
+            angleDownBtn.disabled = true;
+            fireBtn.disabled = true;
+        }
+
+        // Draw game elements
+        function drawGame() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw ground
+            ctx.fillStyle = '#27ae60'; // Green ground
+            ctx.fillRect(0, canvas.height - GROUND_HEIGHT, canvas.width, GROUND_HEIGHT);
+
+            // Draw wall
+            ctx.fillStyle = wall.color;
+            ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+
+            // Draw Player 1 tank
+            drawTank(player1);
+
+            // Draw Player 2 (AI) tank
+            drawTank(player2);
+
+            // Draw projectile (if animating)
+            if (projectile) {
+                ctx.fillStyle = 'black';
+                ctx.beginPath();
+                ctx.arc(projectile.x, projectile.y, PROJECTILE_RADIUS, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Draw tank function
+        function drawTank(player) {
+            ctx.fillStyle = player.color;
+
+            // Body
+            ctx.beginPath();
+            ctx.roundRect(player.x - TANK_WIDTH / 2, player.y - TANK_HEIGHT / 2, TANK_WIDTH, TANK_HEIGHT, 5);
+            ctx.fill();
+
+            // Wheels
+            ctx.beginPath();
+            ctx.arc(player.x - TANK_WIDTH / 4, player.y + TANK_HEIGHT / 2 - 5, 8, 0, Math.PI * 2);
+            ctx.arc(player.x + TANK_WIDTH / 4, player.y + TANK_HEIGHT / 2 - 5, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#444';
+            ctx.fill();
+
+            // Cannon
+            ctx.save();
+            ctx.translate(player.x, player.y - TANK_HEIGHT / 2); // Center of cannon rotation
+            ctx.rotate(-player.angle * Math.PI / 180 * player.direction); // Rotate based on angle
+            ctx.fillStyle = '#555';
+            ctx.beginPath();
+            ctx.roundRect(0, -5, CANNON_LENGTH, 10, 3); // Cannon barrel
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Projectile animation
+        function animateProjectile() {
+            if (!projectile) return;
+
+            // Update position based on time
+            projectile.x += projectile.vx;
+            projectile.y += projectile.vy;
+            projectile.vy += GRAVITY; // Apply gravity
+
+            // Check collision with wall
+            if (checkCollision(projectile, wall)) {
+                handleImpact(projectile.x, projectile.y);
+                showMessage('성벽에 명중!', 'info');
+                if (currentPlayer === player2) { // Record AI's hit position for learning
+                    aiLastShotHitX = projectile.x;
+                }
+                projectile = null;
+                isAnimating = false;
+                resetCurrentPlayerPower(); // Reset power
+                switchTurn(); // Switch turn
+                return;
+            }
+
+            // Canvas boundary check (if it hits ground or goes out of bounds)
+            if (projectile.x < 0 || projectile.x > canvas.width || projectile.y > canvas.height - GROUND_HEIGHT) {
+                handleImpact(projectile.x, canvas.height - GROUND_HEIGHT);
+                if (currentPlayer === player2) { // Record AI's hit position for learning
+                    aiLastShotHitX = projectile.x;
+                }
+                projectile = null;
+                isAnimating = false;
+                resetCurrentPlayerPower(); // Reset power
+                switchTurn(); // Switch turn
+                return;
+            }
+
+            // Player collision detection
+            let targetPlayer = (currentPlayer === player1) ? player2 : player1;
+            let distance = Math.sqrt(
+                Math.pow(projectile.x - targetPlayer.x, 2) +
+                Math.pow(projectile.y - targetPlayer.y, 2)
+            );
+
+            if (distance < TANK_WIDTH / 2 + PROJECTILE_RADIUS) { // Hit the tank
+                handleImpact(projectile.x, projectile.y);
+                targetPlayer.health -= DAMAGE;
+                if (targetPlayer.health < 0) targetPlayer.health = 0; // Prevent health from going below 0
+
+                // Tank red flash effect
+                targetPlayer.color = 'red';
+                drawGame(); // Redraw immediately to show red
+                setTimeout(() => {
+                    targetPlayer.color = targetPlayer.originalColor;
+                    drawGame(); // Redraw to revert color
+                }, HIT_FLASH_DURATION);
+
+                // Full screen red flash effect
+                flashOverlay.style.backgroundColor = 'rgba(255, 0, 0, 0.8)'; // Intense red
+                flashOverlay.style.opacity = 1;
+                setTimeout(() => {
+                    flashOverlay.style.opacity = 0; // Fade out
+                    flashOverlay.style.backgroundColor = 'transparent'; // Reset color
+                }, HIT_FLASH_DURATION);
+
+                // Play hit sound
+                if (hitSound) {
+                    hitSound.currentTime = 0; // Rewind to start
+                    hitSound.play().catch(e => console.log("Hit sound play failed:", e));
+                }
+
+                showMessage(`${targetPlayer === player2 ? '컴퓨터' : '플레이어 1'} 명중! ${DAMAGE} 데미지!`, 'success');
+                if (currentPlayer === player2) { // Record AI's hit position for learning
+                    aiLastShotHitX = projectile.x;
+                }
+                projectile = null;
+                isAnimating = false;
+                resetCurrentPlayerPower(); // Reset power
+                checkWinCondition(); // Check win condition
+                switchTurn(); // Switch turn
+                return;
+            }
+
+            drawGame();
+            requestAnimationFrame(animateProjectile);
+        }
+
+        // Collision detection for circle (projectile) and rectangle (wall)
+        function checkCollision(circle, rect) {
+            // Find the closest point on the rectangle to the center of the circle
+            let testX = circle.x;
+            let testY = circle.y;
+
+            if (circle.x < rect.x) {
+                testX = rect.x;      // left edge
+            } else if (circle.x > rect.x + rect.width) {
+                testX = rect.x + rect.width;   // right edge
+            }
+
+            if (circle.y < rect.y) {
+                testY = rect.y;      // top edge
+            } else if (circle.y > rect.y + rect.height) {
+                testY = rect.y + rect.height;  // bottom edge
+            }
+
+            // Calculate the distance between the closest point and the circle's center
+            let distX = circle.x - testX;
+            let distY = circle.y - testY;
+            let distance = Math.sqrt((distX * distX) + (distY * distY));
+
+            // Check if the distance is less than the circle's radius
+            return distance <= PROJECTILE_RADIUS;
+        }
+
+        // Impact handling (explosion effect)
+        function handleImpact(x, y) {
+            // Simple explosion effect (orange/yellow circles)
+            ctx.fillStyle = 'orange';
+            ctx.beginPath();
+            ctx.arc(x, y, PROJECTILE_RADIUS * 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = 'yellow';
+            ctx.beginPath();
+            ctx.arc(x, y, PROJECTILE_RADIUS * 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Reset current player's power to initial value
+        function resetCurrentPlayerPower() {
+            currentPlayer.power = INITIAL_POWER;
+            updateUI();
+        }
+
+        // Switch turn
+        function switchTurn() {
+            if (isAnimating) return; // Prevent turn switch during animation
+
+            currentPlayer = (currentPlayer === player1) ? player2 : player1;
+            updateUI();
+            drawGame();
+
+            if (currentPlayer === player2) {
+                // Computer (AI) turn
+                showMessage('컴퓨터 턴입니다...', 'info');
+                disablePlayerControls();
+                setTimeout(aiTurn, 1500); // Delay AI turn
+            } else {
+                // Player 1 turn
+                showMessage('플레이어 1 턴입니다.', 'info');
+                enablePlayerControls();
+            }
+        }
+
+        // Check win condition
+        function checkWinCondition() {
+            if (player1.health <= 0) {
+                player1.lives--;
+                if (player1.lives <= 0) {
+                    showMessage('컴퓨터 승리! 플레이어 1 패배!', 'default');
+                    disablePlayerControls();
+                    fireBtn.disabled = true; // Disable fire button
+                    return;
+                } else {
+                    player1.health = 100; // Restore health
+                    showMessage('플레이어 1 체력 소진! 생명 1개 감소!', 'info');
+                }
+            } else if (player2.health <= 0) {
+                player2.lives--;
+                if (player2.lives <= 0) {
+                    showMessage('플레이어 1 승리! 컴퓨터 패배!', 'success');
+                    disablePlayerControls();
+                    fireBtn.disabled = true; // Disable fire button
+                    return;
+                } else {
+                    player2.health = 100; // Restore health
+                    showMessage('컴퓨터 체력 소진! 생명 1개 감소!', 'info');
+                }
+            }
+            updateUI(); // Reflect health/lives changes
+        }
+
+        /**
+         * Predicts the landing X coordinate of a projectile given initial conditions.
+         * @param {number} initialX - Starting X position.
+         * @param {number} initialY - Starting Y position.
+         * @param {number} initialVelocity - Initial velocity (power).
+         * @param {number} angleDegrees - Launch angle in degrees (0-90, relative to horizontal).
+         * @param {number} direction - 1 for right, -1 for left.
+         * @param {number} groundY - Y coordinate of the ground.
+         * @param {object} firingPlayer - The player firing the projectile (used for self-collision check).
+         * @returns {number|null} Predicted landing X, or null if it goes off screen or hits wall/self.
+         */
+        function predictProjectileLandingX(initialX, initialY, initialVelocity, angleDegrees, direction, groundY, firingPlayer) {
+            const angleRad = angleDegrees * Math.PI / 180;
+            let vx = initialVelocity * Math.cos(angleRad) * direction;
+            let vy = -initialVelocity * Math.sin(angleRad); // Y-axis decreases upwards
+
+            let currentX = initialX;
+            let currentY = initialY;
+
+            // Simulate step by step to find landing point and check for wall/self collision
+            const step = 1; // Smaller step for more accurate collision detection
+            for (let i = 0; i < 1000; i++) { // Max iterations to prevent infinite loop
+                currentX += vx * step;
+                currentY += vy * step;
+                vy += GRAVITY * step;
+
+                // Check for wall collision during prediction
+                if (checkCollision({x: currentX, y: currentY, radius: PROJECTILE_RADIUS}, wall)) {
+                    return null; // Hits wall, invalid trajectory
+                }
+
+                // Check for self-tank collision during prediction (AI specific)
+                // Only check if the projectile is near the firing player's tank
+                if (firingPlayer === player2 &&
+                    currentX > player2.x - TANK_WIDTH / 2 && currentX < player2.x + TANK_WIDTH / 2 &&
+                    currentY > player2.y - TANK_HEIGHT / 2 && currentY < player2.y + TANK_HEIGHT / 2) {
+                    return null; // Hits self, invalid trajectory
+                }
+
+                // Check if it hit the ground
+                if (currentY >= groundY) {
+                    return currentX;
+                }
+                // Check if it went off screen horizontally
+                if (currentX < 0 || currentX > canvas.width) {
+                    return null; // Went off screen
+                }
+            }
+            return null; // Did not land within simulation steps
+        }
+
+
+        // AI turn logic
+        function aiTurn() {
+            const targetX = player1.x;
+            const aiTankX = player2.x;
+            const aiTankY = player2.y - TANK_HEIGHT / 2; // Approximate cannon Y
+            const aiDirection = player2.direction;
+
+            let bestAngle = 0;
+            let bestPower = 0;
+            let minDistanceToTarget = Infinity;
+            let foundValidShot = false;
+
+            // Iterate through a finer range of angles and powers to find the best shot
+            // Increased granularity for better AI accuracy
+            for (let p = MIN_POWER; p <= MAX_POWER; p += 0.2) { // Iterate power with smaller steps
+                for (let a = MIN_ANGLE; a <= MAX_ANGLE; a += 0.5) { // Iterate angle with smaller steps
+                    // AI's angle is 180 - a because it shoots left
+                    const predictedLandingX = predictProjectileLandingX(aiTankX, aiTankY, p, a, aiDirection, canvas.height - GROUND_HEIGHT, player2);
+
+                    if (predictedLandingX !== null) {
+                        const distanceToTarget = Math.abs(predictedLandingX - targetX);
+
+                        // Prioritize shots that clear the wall and are close to target
+                        // Ensure it lands between AI and target (for left-shooting AI)
+                        const isBetweenTanks = (aiDirection === -1 && predictedLandingX <= aiTankX && predictedLandingX >= targetX);
+
+                        if (isBetweenTanks) {
+                            if (distanceToTarget < minDistanceToTarget) {
+                                minDistanceToTarget = distanceToTarget;
+                                bestAngle = a;
+                                bestPower = p;
+                                foundValidShot = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // If a good shot was found, use it. Otherwise, fall back to a more intelligent default shot.
+            if (foundValidShot) {
+                angle = bestAngle;
+                power = bestPower;
+
+                // Add small random deviation to chosen values
+                angle += (Math.random() - 0.5) * AI_RANDOM_DEVIATION_ANGLE;
+                power += (Math.random() - 0.5) * AI_RANDOM_DEVIATION_POWER;
+            } else {
+                // Fallback for when no ideal shot is found (e.g., target too close, impossible angle, or wall blocking)
+                // Try to find a shot that at least clears the wall and goes generally towards the target area.
+                // This is a simpler search for a "safe" shot if a perfect one isn't found.
+                let fallbackAngle = 60; // Start with a high angle to clear wall
+                let fallbackPower = MIN_POWER + (MAX_POWER - MIN_POWER) / 2; // Mid-range power
+
+                // Attempt to find a power that clears the wall at 60 degrees
+                let tempPredictedX = predictProjectileLandingX(aiTankX, aiTankY, fallbackPower, fallbackAngle, aiDirection, canvas.height - GROUND_HEIGHT, player2);
+                if (tempPredictedX === null || (aiDirection === -1 && tempPredictedX > aiTankX)) { // If it hits wall/self or goes backwards
+                    // Try increasing power until it clears or reaches max
+                    for (let p_try = fallbackPower; p_try <= MAX_POWER; p_try += 1) {
+                        tempPredictedX = predictProjectileLandingX(aiTankX, aiTankY, p_try, fallbackAngle, aiDirection, canvas.height - GROUND_HEIGHT, player2);
+                        if (tempPredictedX !== null && (aiDirection === -1 ? tempPredictedX < aiTankX : tempPredictedX > aiTankX)) {
+                            fallbackPower = p_try;
+                            break;
+                        }
+                    }
+                }
+                // Apply a slightly larger random deviation for fallback shots
+                angle = fallbackAngle + (Math.random() - 0.5) * (AI_RANDOM_DEVIATION_ANGLE * 5);
+                power = fallbackPower + (Math.random() - 0.5) * (AI_RANDOM_DEVIATION_POWER * 5);
+            }
+
+            // Clamp values to valid ranges
+            angle = Math.max(MIN_ANGLE, Math.min(MAX_ANGLE, angle));
+            power = Math.max(MIN_POWER, Math.min(MAX_POWER, power));
+
+            // Set AI's actual firing angle (180 - angle for left-shooting tank)
+            currentPlayer.angle = 180 - angle;
+            currentPlayer.power = power;
+
+            // AI fire simulation
+            setTimeout(() => {
+                fireProjectile();
+                aiShotCount++;
+            }, 1000); // Fire after 1 second
+        }
+
+
+        // Fire projectile
+        function fireProjectile() {
+            if (isAnimating || currentPlayer.health <= 0) return;
+
+            isAnimating = true;
+            disablePlayerControls(); // Disable controls during fire animation
+
+            const angleRad = currentPlayer.angle * Math.PI / 180;
+            const initialVelocity = currentPlayer.power;
+
+            // Projectile initial position (cannon tip)
+            let startX, startY;
+            if (currentPlayer.direction === 1) { // Firing right
+                startX = currentPlayer.x + CANNON_LENGTH * Math.cos(angleRad);
+                startY = currentPlayer.y - TANK_HEIGHT / 2 - CANNON_LENGTH * Math.sin(angleRad);
+            } else { // Firing left
+                startX = currentPlayer.x - CANNON_LENGTH * Math.cos(angleRad);
+                startY = currentPlayer.y - TANK_HEIGHT / 2 - CANNON_LENGTH * Math.sin(angleRad);
+            }
+
+            projectile = {
+                x: startX,
+                y: startY,
+                vx: initialVelocity * Math.cos(angleRad) * currentPlayer.direction,
+                vy: -initialVelocity * Math.sin(angleRad) // Y-axis decreases upwards
+            };
+
+            // Play fire sound
+            if (fireSound) {
+                fireSound.currentTime = 0; // Rewind to start
+                fireSound.play().catch(e => console.log("Fire sound play failed:", e));
+            }
+
+            animateProjectile();
+        }
+
+        // Event Listeners
+        moveLeftBtn.addEventListener('click', () => {
+            if (isAnimating || currentPlayer !== player1) return;
+            currentPlayer.x = Math.max(TANK_WIDTH / 2, currentPlayer.x - MOVE_SPEED);
+            currentPlayer.direction = 1; // Player 1 always faces right
+            drawGame();
+        });
+
+        moveRightBtn.addEventListener('click', () => {
+            if (isAnimating || currentPlayer !== player1) return;
+            currentPlayer.x = Math.min(canvas.width - TANK_WIDTH / 2, currentPlayer.x + MOVE_SPEED);
+            currentPlayer.direction = 1; // Player 1 always faces right
+            drawGame();
+        });
+
+        angleUpBtn.addEventListener('click', () => {
+            if (isAnimating || currentPlayer !== player1) return;
+            currentPlayer.angle = Math.min(MAX_ANGLE, currentPlayer.angle + ANGLE_CHANGE_SPEED);
+            drawGame();
+        });
+
+        angleDownBtn.addEventListener('click', () => {
+            if (isAnimating || currentPlayer !== player1) return;
+            currentPlayer.angle = Math.max(MIN_ANGLE, currentPlayer.angle - ANGLE_CHANGE_SPEED);
+            drawGame();
+        });
+
+        // Fire button mouse down (start charging power)
+        fireBtn.addEventListener('mousedown', () => {
+            if (isAnimating || currentPlayer !== player1 || powerCharging) return;
+            powerCharging = true;
+            fireBtn.textContent = '파워 충전 중...';
+            powerChargeInterval = setInterval(() => {
+                currentPlayer.power = Math.min(MAX_POWER, currentPlayer.power + 1);
+                updateUI();
+            }, 50); // Increase power every 50ms
+        });
+
+        // Fire button mouse up (fire projectile)
+        fireBtn.addEventListener('mouseup', () => {
+            if (!powerCharging || currentPlayer !== player1) return;
+            clearInterval(powerChargeInterval);
+            powerCharging = false;
+            fireBtn.textContent = '발사!';
+            fireProjectile();
+        });
+
+        // Handle mouse up outside canvas (if charging started on button)
+        canvas.addEventListener('mouseup', () => {
+            if (!powerCharging || currentPlayer !== player1) return;
+            clearInterval(powerChargeInterval);
+            powerCharging = false;
+            fireBtn.textContent = '발사!';
+            fireProjectile();
+        });
+
+        // Keyboard event listeners
+        document.addEventListener('keydown', (e) => {
+            if (isAnimating || currentPlayer !== player1) return;
+
+            const key = e.key.toLowerCase();
+            if (key === ' ') { // Prevent default spacebar action (scrolling)
+                e.preventDefault();
+            }
+
+            if (keys[key] === false) { // Only process if key was not already pressed
+                keys[key] = true;
+
+                switch (key) {
+                    case 'a': // Move left
+                        currentPlayer.x = Math.max(TANK_WIDTH / 2, currentPlayer.x - MOVE_SPEED);
+                        break;
+                    case 'd': // Move right
+                        currentPlayer.x = Math.min(canvas.width - TANK_WIDTH / 2, currentPlayer.x + MOVE_SPEED);
+                        break;
+                    case 'w': // Angle up
+                        currentPlayer.angle = Math.min(MAX_ANGLE, currentPlayer.angle + ANGLE_CHANGE_SPEED);
+                        break;
+                    case 's': // Angle down
+                        currentPlayer.angle = Math.max(MIN_ANGLE, currentPlayer.angle - ANGLE_CHANGE_SPEED);
+                        break;
+                    case ' ': // Spacebar (fire)
+                        if (!powerCharging) {
+                            powerCharging = true;
+                            fireBtn.textContent = '파워 충전 중...'; // Update button text
+                            powerChargeInterval = setInterval(() => {
+                                currentPlayer.power = Math.min(MAX_POWER, currentPlayer.power + 1);
+                                updateUI();
+                            }, 50);
+                        }
+                        break;
+                }
+                drawGame();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            if (keys[key] === true) { // Only process if key was pressed
+                keys[key] = false;
+
+                if (key === ' ') { // Spacebar released
+                    if (powerCharging && currentPlayer === player1) {
+                        clearInterval(powerChargeInterval);
+                        powerCharging = false;
+                        fireBtn.textContent = '발사!'; // Update button text
+                        fireProjectile();
+                    }
+                }
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            initGame();
+        });
+
+        // Play background music on first user interaction (e.g., click or keydown)
+        function playBgMusic() {
+            if (bgMusic.paused) {
+                bgMusic.play().catch(e => console.log("Background music play failed:", e));
+            }
+        }
+        document.addEventListener('click', playBgMusic, { once: true });
+        document.addEventListener('keydown', playBgMusic, { once: true });
+
+
+        // Initial game start
+        window.onload = initGame;
+
+        // Canvas resize (responsive)
+        function resizeCanvas() {
+            const containerWidth = document.getElementById('game-container').clientWidth;
+            canvas.width = containerWidth - 40; // Account for container padding
+            canvas.height = (canvas.width / 4) * 3; // Maintain 4:3 aspect ratio
+
+            // Recalculate tank and wall positions
+            player1.y = canvas.height - GROUND_HEIGHT - TANK_HEIGHT / 2;
+            player2.y = canvas.height - GROUND_HEIGHT - TANK_HEIGHT / 2;
+            player2.x = canvas.width - 100; // Maintain relative position
+
+            wall.x = canvas.width / 2 - wall.width / 2;
+            wall.y = canvas.height - GROUND_HEIGHT - wall.height;
+
+            drawGame();
+            updateUI();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas(); // Initial load resize
+    </script>
+</body>
+</html>
